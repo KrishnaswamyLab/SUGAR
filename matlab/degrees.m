@@ -1,8 +1,6 @@
-function [ d_hat,s_hat,sigma] = degree_sparsity_est(data,varargin)
+function [ d_hat,s_hat,sigma] = degrees(data,varargin)
 %This function computes the degree d_hat(i) and sparsity level s_hat(i).
-
 %Authors: Ofir Lindenbaum, Jay S. Stanely III.
-
 %Input 
 %       data= data matrix. Rows are measurments, columns are features.
 % varargin:
@@ -19,20 +17,16 @@ function [ d_hat,s_hat,sigma] = degree_sparsity_est(data,varargin)
 %       sigma= the estimated sigma
 %  
 
-method='std';
-sigma=[];
-
-
-
-for i=1:length(varargin)
-    % adaptive k-nn bandwidth
-    if(strcmp(varargin{i},'method'))
-       method =  lower(varargin{i+1});
-    end
-    if(strcmp(varargin{i},'sigma'))
-       sigma =  lower(varargin{i+1});
-    end
+if isstruct(varargin{1})
+    params = varargin{1}
+    method = params.method
+    sigma = params.sigma
+else
+    [data, params] = init(data, varargin)
 end
+
+
+
 
 N=size(data,2);
 D=pdist2(data, data);

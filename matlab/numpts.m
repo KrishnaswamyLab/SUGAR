@@ -1,5 +1,6 @@
-function [l_hat] = generation_level_est(d_hat,varargin)
-%This function computes generation level l(i).
+function [l_hat] = numpts(d_hat,varargin)
+%NUMPTS Compute the number of new points to generate around each point in a
+%       dataset
 
 %Authors: Ofir Lindenbaum, Jay S. Stanely III.
 

@@ -1,4 +1,4 @@
-function [sigma_n] = local_cov_est(data,varargin)
+function [sigma_n] = local_covariance(data,varargin)
 %This function computes local k-nn covariance matrices
 
 %Authors: Ofir Lindenbaum, Jay S. Stanely III.
