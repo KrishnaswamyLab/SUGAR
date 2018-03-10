@@ -1,12 +1,15 @@
-function random_points=data_generation(data,l_hat,sigma_n)
-
-%This function generates the data
-
-%Authors: Ofir Lindenbaum, Jay S. Stanely III.
-
+function random_points = generate(data, npts, noise_cov)
+%GENERATE Compute the number of new points to generate around each point in a
+%       dataset     https://arxiv.org/abs/1802.04927
+% Authors: Ofir Lindenbaum, Jay S. Stanley III.
+%
+% Usage:
+%         npts = numpts(degree, varargin) Generate npts, the estimate of
+%         the number of points generate according to degree.
+%
 %Input 
-%       data= d_hat, degree estimate.
-%       l_hat=number of points to generate
+%       data
+%       npts=number of points to generate
 %       sigma_n= covariance for the Gaussian
 %       
 %Output
