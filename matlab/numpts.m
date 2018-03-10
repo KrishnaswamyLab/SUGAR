@@ -1,70 +1,146 @@
-function [l_hat] = numpts(d_hat,varargin)
+function npts = numpts(degree,varargin)
 %NUMPTS Compute the number of new points to generate around each point in a
-%       dataset
-
-%Authors: Ofir Lindenbaum, Jay S. Stanely III.
-
-%Input 
-%       data= d_hat, degree estimate.
+%       dataset     https://arxiv.org/abs/1802.04927
+% Authors: Ofir Lindenbaum, Jay S. Stanley III.
+%
+% Usage:
+%         npts = numpts(degree, varargin) Generate npts, the estimate of
+%         the number of points generate according to degree.
+%
+% Input: 
+%       degree
+%               Degree estimate of the N x D data
+%                   Accepts:
+%                       N x 1 numeric
 %   varargin:
-%       sigma= bandwidth of the degree estimate
-%       sigma_n: 
-%       Option A: a scalar Gaussian noise variance
-%       Option B: a cell of local covariance matrices of the Gaussian
-%                   generated noise. 
-%       dim= the dimension of generated noise
-
-%       
-%Output
-%       l_hat= the number of points to generate at each point
+%       noise_cov       (default = 1)
+%               Noise bandwidth used for downstream data generation
+%                   Accepts:
+%                       Scalar - uniform Gaussian noise variance
+%                       N x 1 cell - contains D x D local covariance
+%                       matrices for Gaussian generated noise
+%
+%       kernel_sigma        (default = 1)
+%               Degree estimate bandwidth
+%                   Accepts:
+%                       N x 1 numeric - adaptive bandwidth 
+%                       Scalar - uniform bandwidth
+%
+%                  
+%       dim             (default = D if available from noise_cov, else required)       
+%               Generated noise dimension
+%                   Accepts:
+%                       Scalar
+%
+%       M               (default = 0)
+%               Number of points to generate.  Can affect strength of density
+%               equalization.
+%                   Accepts: 
+%                        positive scalars 
+%                        If (M && equalize) then density equalization will be
+%                        scaled by M.  M < N will negatively impact density
+%                        equalization, M << N is not recommended and M <<< N may fail.
+%                        If (~M && equalize) then density equalization will not be
+%                        scaled
+%                        If (M && ~equalize) then approximately M points will be
+%                        generated according to a constant difference of the
+%                        max density
+%                        If (~M && ~equalize) then M = approx. N points will be
+%                        generated.
+%
+%       equalize        (default = false)
+%               Density equalization.  Can be affected by M.
+%                   Accepts: 
+%                       logical / scalar
+%
+% Output
+%       npts the number of points to generate at each point
 %     
-
-
-%Defaults:
-sigma=1;
-sigma_n=1;
-
-M=length(d_hat);
-equalizeF=0;
-for i=1:length(varargin)
-    % adaptive k-nn bandwidth
-    if(strcmp(varargin{i},'sigma'))
-       sigma =  lower(varargin{i+1});
-    end
-    if(strcmp(varargin{i},'sigma_n'))
-       sigma_n =  (varargin{i+1});
-    end
-     if(strcmp(varargin{i},'dim'))
-       dim =  lower(varargin{i+1});
-     end
-     if(strcmp(varargin{i},'M'))
-       M =  lower(varargin{i+1});
-     end
-    if(strcmp(varargin{i},'equalizeF'))
-       equalizeF =  lower(varargin{i+1});
-    end
-end
-
-
- Const=max(d_hat);
+[degree, noise_cov, kernel_sigma, dim, M, equalize] = init(degree, varargin{:});
+N = length(degree);
+Const=max(degree);
  
- 
-if equalizeF
-        if length(sigma_n)==1
-                NumberEstimate=(Const-d_hat)*((sigma^2+sigma_n^2)/((2)*sigma_n^2))^(dim/2);
+NumberEstimate = zeros(N, 1);
+if equalize
+        if isscalar(noise_cov)
+                disp("Density equalization according to scalar noise covariance...")
+                NumberEstimate=(Const-degree)*((kernel_sigma^2+noise_cov^2)/((2)*noise_cov^2))^(dim/2);
         else
-            for i=1:length(d_hat)
-                NumberEstimate(i)=(Const-d_hat(i))*det(sigma_n{i}^(-0.5)+(sigma_n{i}^(0.5))./(2*sigma^2));
+            for i=1:N
+                disp("Density equalization according to local noise covariance...")
+                NumberEstimate(i)=(Const-degree(i))*det(noise_cov{i}^(-0.5)+(noise_cov{i}^(0.5))./(2*kernel_sigma^2));
             end
+            
+        end
+        if logical(M)
+            disp("Applying total generation constraint M.")
+            number_save = NumberEstimate;
+            number_sum = sum(NumberEstimate);
+            if M/number_sum < 1e-1
+                warning(['Supplied M is ' num2str((M/number_sum)*100) '% of equalized total. ', 'Output will not reflect equalization. Increased M is suggested.'])
+            end
+            NumberEstimate = NumberEstimate*M/sum(NumberEstimate);
+            npts = round(NumberEstimate,0);
+        else
+            npts = floor(NumberEstimate);
         end
 else
-    NumberEstimate=(Const-d_hat);
-    NumberEstimate=NumberEstimate*M/sum(NumberEstimate);
+    disp("Generating without density equalization")
+    if ~logical(M)
+        disp("No M supplied, M = N.")
+        M = N;
+    end
+    NumberEstimate=(Const-degree);
+    NumberEstimate = NumberEstimate*M/sum(NumberEstimate);
+    npts = round(NumberEstimate,0);
 end
-l_hat=floor(NumberEstimate);
-if sum(l_hat)==0
-    error('l_hat=0, either provide M or decrease sigma_n');
-elseif sum(l_hat)>10^4
-    error('l_hat>1e4, either provide M or increase sigma');
+
+if sum(npts)==0
+    error('Point generation estimate < 0 , either provide/increase M or decrease noise_cov');
+elseif sum(npts)>10^4
+    error('Point generation > 1e4, either provide/decrease M or increase noise_cov');
 end
+end
+
+function [degree, noise_cov, kernel_sigma, dim, M, equalize] = init(degree, varargin)
+    % helpers
+    scalarPos = @(x) isscalar(x) && (x>0);
+    check_noise = @(x) isscalar(x) || (iscell(x) && ~isempty(x) && size(x{1},1) == size(x{1},2));
+    check_vec = @(x) isnumeric(x) && min(size(x))==1;
+
+    % defaults
+    default.noise_cov = 1;
+    default.kernel_sigma = 1;
+    default.dim = [];
+    default.M = 0;
+    default.equalize = false;
+
+    persistent p
+    
+    if isempty(p)
+        % configure parser
+        p = inputParser;
+        addRequired(p, 'degree', check_vec);
+        addParameter(p, 'noise_cov', default.noise_cov, check_noise);
+        addParameter(p, 'kernel_sigma', default.kernel_sigma, check_vec);
+        addParameter(p, 'dim', default.dim, scalarPos);
+        addParameter(p, 'M', default.M, @isscalar);
+        addParameter(p, 'equalize', default.equalize, @isscalar);
+    end
+    % parse
+    parse(p, degree, varargin{:});
+    degree = p.Results.degree;
+    noise_cov = p.Results.noise_cov;
+    kernel_sigma = p.Results.kernel_sigma;
+    dim = p.Results.dim;
+    M = p.Results.M;
+    equalize = p.Results.equalize;
+    
+    if isempty(dim) % check if dimension supplied
+        if iscell(noise_cov) % we can get the dimension from local covariance matrices
+            dim = size(noise_cov{1},1);
+        else
+            error("'dim' is required if 'noise_cov' is not a cell")
+        end
+    end
 end
