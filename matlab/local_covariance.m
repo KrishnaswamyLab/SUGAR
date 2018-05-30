@@ -42,8 +42,8 @@ parse(p,data,varargin{:});
 k = p.Results.k;
 data = p.Results.data;
 
+
 % initialize
-local_cov = cell(size(data,1),1);
 
 % compute covariances
 for i=1:size(data,1)

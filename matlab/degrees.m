@@ -13,8 +13,8 @@ function [d_hat,s_hat,sigma] = degrees(data, varargin)
 %                   Accepts: 
 %                       numeric
 %   varargin: 
-%       kernel_sigma      (default = 'std')
-%               Diffusion kernel bandwidth. 
+%       sigma      (default = 'std')
+%               Gaussian kernel bandwidth. 
 %                   Accepts:    
 %                        'std'- standard deviation of the distances
 %                        'knn' - adaptive bandwidth,eg  kth neighbor distance
@@ -25,10 +25,17 @@ function [d_hat,s_hat,sigma] = degrees(data, varargin)
 %                         scalar - pre-computed bandwidth
 %
 %       k               (default = 5)
-%               k-Nearest neighbor distance to use if kernel_sigma = 'knn'
-%               Accepts:
+%               k-Nearest neighbor distance to use if sigma = 'knn'
+%                   Accepts:
 %                       positive scalars
-%
+%       a               (default = 2)
+%               Alpha-kernel decay parameter. 2 is Gaussian kernel.
+%                   Accepts:
+%                       positive scalars
+%       fac             (default = 1)
+%               Rescale kernel bandwidth
+%                   Accepts:
+%                       positive scalars
 % Output:
 %       d_hat
 %               N x 1 vector of the degree at each point in data of size N
@@ -38,30 +45,11 @@ function [d_hat,s_hat,sigma] = degrees(data, varargin)
 %               N x 1 (adaptive) or scalar (constant) estimated kernel bandwidth
 %  
 
-[data, kernel_sigma, k] = init(data,varargin{:});
-%construct kernel
+[data, sigma, a,k,fac] = init(data,varargin{:});
 N=size(data,2);
-D=pdist2(data, data);
 
-if strcmp(kernel_sigma,'minmax')
-    MinDv=min(D+eye(size(D))*10^15);
-    eps_val=(max(MinDv));
-    sigma=2*(eps_val)^2;
-elseif strcmp(kernel_sigma,'median')
-    sigma=median(median(D));
-elseif strcmp(kernel_sigma, 'std')
-    sigma=std(mean(D));
-elseif strcmp(kernel_sigma, 'knn')
-    knnDST = sort(D);
-    sigma = knnDST(k+1,:);
-elseif isscalar(kernel_sigma)
-    sigma = kernel_sigma;
-elseif isa(kernel_sigma, 'function_handle')
-    sigma = kernel_sigma(D);
-end
-
-%Compute kernel elements
-K=exp(-(D.^2./(2.*sigma.^2))); 
+%construct kernel
+[K,sigma] = gauss_kernel(data,data, 'sigma', sigma, 'a', a, 'k', k, 'fac', fac);
 p = sum(K);
 
 % Compute ouputs
@@ -72,7 +60,7 @@ s_hat=1./d_hat;
 
 end
 
-function [data, kernel_sigma, k] = init(data, varargin)
+function [data, sigma, a, k, fac] = init(data, varargin)
     % helpers
     function tf = check_sigma(passed)
     % check that diffusion sigma is correct type
@@ -87,21 +75,26 @@ function [data, kernel_sigma, k] = init(data, varargin)
     scalarPos = @(x) isscalar(x) && (x>0);
 
     % defaults
-    default.kernel_sigma = 'std';
+    default.sigma = 'std';
     default.k = 5;
-
+    default.a = 2;
+    default.fac = 1;
     %parser configuration
     persistent p
     if isempty(p)
         p = inputParser;
         addRequired(p, 'data', @isnumeric);
-        addParameter(p, 'kernel_sigma', default.kernel_sigma,@check_sigma);
+        addParameter(p, 'sigma', default.sigma,@check_sigma);
         addParameter(p, 'k', default.k, scalarPos);
+        addParameter(p, 'a', default.a, scalarPos);
+        addParameter(p,'fac', default.fac,scalarPos);
     end
     %parse
     parse(p, data, varargin{:})
     data = p.Results.data;
-    kernel_sigma = p.Results.kernel_sigma;
+    sigma = p.Results.sigma;
     k = p.Results.k;
+    a = p.Results.a;
+    fac = p.Results.fac;
 end
 
