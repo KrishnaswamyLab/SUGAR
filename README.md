@@ -11,7 +11,7 @@ SUGAR has been implemented in Python3 and Matlab.
 
 ### Getting started
 
-#### Python installation and dependencies
+#### Python installation and dependencies (Python not available yet!!!)
 1. The Python3 version of SUGAR can be installed using:
 
         $ git clone git://github.com/SmitaKrishnaswamy/
@@ -27,4 +27,4 @@ All the dependencies will be automatically installed using the above commands
         $ git clone git://github.com/SmitaKrishnaswamy/SUGAR.git
         $ cd SUGAR/Matlab
 
-2. Add the SUGAR/Matlab directory to your MATLAB path and run any of our `test` scripts to get a feel for PHATE.
+2. Add the SUGAR/Matlab directory to your MATLAB path and run any of our `test` scripts to get a feel for SUGAR.
